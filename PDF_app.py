@@ -253,14 +253,20 @@ def answer_question(question, section_text):
         return f"[Error] {str(e)}"
 
 
-def summarize_text(input_text, summary_type="general"):
-    if summary_type == "general":
-        prompt = f"""Please provide a concise and clear summary of the following text. Focus on the main points and key information:\n\n{input_text[:4000]}"""
-    elif summary_type == "academic":
-        prompt = f"""Please provide an academic summary of the following text, highlighting key concepts, main arguments, and important details:\n\n{input_text[:4000]}"""
-    elif summary_type == "bullet":
-        prompt = f"""Please summarize the following text in bullet points, organizing the main ideas clearly:\n\n{input_text[:4000]}"""
+def summarize_calendar_content(subject):
+    section = identify_section(subject)
+    section_text = SECTION_TEXTS[section]
+    
+    prompt = f"""You are a helpful academic advisor at Bishop's University. 
+Please provide a comprehensive summary about "{subject}" based on the following academic calendar section.
+Focus on the key information that would be most useful for students.
 
+Section: {section_text}
+
+Subject: {subject}
+
+Please provide a detailed summary covering all relevant information about this topic:"""
+    
     try:
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
@@ -303,30 +309,45 @@ with col1:
             st.write(answer)
 
 with col2:
-    st.header("📝 Text Summarizer")
-
-    input_text = st.text_area(
-        "Enter text to summarize:",
-        height=300,
-        placeholder="Paste your text here..."
+    st.header("📝 Academic Calendar Summarizer")
+    st.write("Enter a subject/topic to get a summary from the BU Academic Calendar.")
+    
+    subject_input = st.text_input(
+        "Enter subject or topic:",
+        placeholder="e.g., tuition fees, admission requirements, scholarships, deadlines..."
     )
-
+    
     if st.button("Generate Summary", type="primary"):
-        if input_text.strip():
-            with st.spinner("Generating summary..."):
-                summary = summarize_text(input_text, "general")
-
+        if subject_input.strip():
+            with st.spinner("Generating summary from Academic Calendar..."):
+                section = identify_section(subject_input)
+                summary = summarize_calendar_content(subject_input)
+                
                 st.markdown(
                     f"""
                     <div class="summary-section">
-                        <h4>📑 Summary</h4>
+                        <h4>📑 Summary: {subject_input.title()}</h4>
+                        <p><strong>Related Section:</strong> {section.replace('_', ' ').title()}</p>
                         <p>{summary}</p>
                     </div>
                     """,
                     unsafe_allow_html=True
                 )
         else:
-            st.warning("Please enter some text to summarize.")
+            st.warning("Please enter a subject or topic to summarize.")
+    
+    with st.expander("💡 Example Topics"):
+        st.write("""
+        **Try these subjects:**
+        - Tuition and fees
+        - Admission requirements  
+        - Important deadlines
+        - Scholarship opportunities
+        - Housing and residence
+        - Academic regulations
+        - Course requirements
+        - Student services
+        """)
 
 st.markdown(
     """
@@ -336,4 +357,3 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
-
