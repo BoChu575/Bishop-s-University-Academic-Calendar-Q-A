@@ -175,7 +175,7 @@ def add_fullscreen_background():
 add_fullscreen_background()
 
 # Main title
-st.title("Bishop's University AI Assistant")
+st.title("Bishop's University Academic Calendar Assistant")
 
 # Centered answering mode selection
 st.markdown('<div class="center-content">', unsafe_allow_html=True)
@@ -397,3 +397,4 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
