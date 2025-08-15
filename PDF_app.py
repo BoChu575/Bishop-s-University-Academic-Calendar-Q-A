@@ -117,6 +117,14 @@ def add_fullscreen_background():
     else:
         st.warning(f"Not found: image/Purple_Background-scaled.jpg")
 
+st.markdown(
+    """
+    <div class="footer">
+        Copyright © BU. Version 0.1. Last update August 2025
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
 add_fullscreen_background()
 
@@ -221,4 +229,5 @@ if question:
 
         st.subheader("Final Answer (Most Representative Summary)")
         answer = answer_question(question, central)
+
         st.write(answer)
