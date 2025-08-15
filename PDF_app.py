@@ -169,6 +169,7 @@ def add_fullscreen_background():
 
 add_fullscreen_background()
 
+
 st.title("Bishop's University Academic Calendar Q&A")
 
 openai_key = st.secrets["OPENAI_API_KEY"]
@@ -254,6 +255,8 @@ def answer_question(question, section_text):
 
 
 def summarize_calendar_content(subject):
+
+
     section = identify_section(subject)
     section_text = SECTION_TEXTS[section]
     
@@ -280,10 +283,18 @@ Please provide a detailed summary covering all relevant information about this t
 col1, col2 = st.columns([1, 1], gap="large")
 
 with col1:
-    st.header("📚 Academic Calendar Q&A")
+    st.header("📖 Q&A")
 
-    mode = st.radio("Choose Answering Mode", ["Single Model (GPT-3.5)", "Multi-Model (3.5 + 4)"])
-    question = st.text_input("Ask a question about the BU Academic Calendar:")
+    mode = st.radio(
+        "Choose Answering Mode", 
+        ["Single Model (GPT-3.5)", "Multi-Model (3.5 + 4)"],
+        horizontal=True
+    )
+    question = st.text_input(
+        "question", 
+        placeholder="Type your question here...",
+        label_visibility="collapsed"
+    )
 
     if question:
         section = identify_section(question)
@@ -292,8 +303,14 @@ with col1:
 
         if mode.startswith("Single"):
             answer = answer_question(question, section_text)
-            st.subheader("Answer")
-            st.write(answer)
+            st.markdown(
+                f"""
+                <div class="summary-section">
+                    <p>{answer}</p>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
 
         else:
             models = ["gpt-3.5-turbo", "gpt-4"]
@@ -304,50 +321,42 @@ with col1:
             st.subheader("Similarity Matrix")
             st.dataframe(pd.DataFrame(matrix, index=models, columns=models))
 
-            st.subheader("Final Answer (Most Representative Summary)")
             answer = answer_question(question, central)
-            st.write(answer)
+            st.markdown(
+                f"""
+                <div class="summary-section">
+                    <p>{answer}</p>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
 
 with col2:
-    st.header("📝 Academic Calendar Summarizer")
-    st.write("Enter a subject/topic to get a summary from the BU Academic Calendar.")
+    st.header("📃 Summarizer")
+    
     
     subject_input = st.text_input(
-        "Enter subject or topic:",
-        placeholder="e.g., tuition fees, admission requirements, scholarships, deadlines..."
+        "subject",
+        placeholder="e.g., tuition fees, admission requirements, scholarships, deadlines...",
+        label_visibility="collapsed"
     )
     
-    if st.button("Generate Summary", type="primary"):
-        if subject_input.strip():
-            with st.spinner("Generating summary from Academic Calendar..."):
-                section = identify_section(subject_input)
-                summary = summarize_calendar_content(subject_input)
-                
-                st.markdown(
-                    f"""
-                    <div class="summary-section">
-                        <h4>📑 Summary: {subject_input.title()}</h4>
-                        <p><strong>Related Section:</strong> {section.replace('_', ' ').title()}</p>
-                        <p>{summary}</p>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
-        else:
-            st.warning("Please enter a subject or topic to summarize.")
     
-    with st.expander("💡 Example Topics"):
-        st.write("""
-        **Try these subjects:**
-        - Tuition and fees
-        - Admission requirements  
-        - Important deadlines
-        - Scholarship opportunities
-        - Housing and residence
-        - Academic regulations
-        - Course requirements
-        - Student services
-        """)
+    if subject_input.strip():
+        with st.spinner("Generating summary from Academic Calendar..."):
+            section = identify_section(subject_input)
+            summary = summarize_calendar_content(subject_input)
+            
+            st.markdown(f"**Related Section:** {section.replace('_', ' ').title()}")
+            st.markdown(
+                f"""
+                <div class="summary-section">
+                    <p>{summary}</p>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
 
 st.markdown(
     """
