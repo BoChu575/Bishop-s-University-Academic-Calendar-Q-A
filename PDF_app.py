@@ -121,6 +121,8 @@ def add_fullscreen_background():
 
 add_fullscreen_background()
 
+st.title("Bishop's University Academic Calendar Q&A")
+
 st.markdown(
     """
     <div class="footer">
@@ -130,10 +132,6 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-st.title("Bishop's University Academic Calendar Q&A")
-
-
-# 使用Streamlit secrets管理API密钥
 openai_key = st.secrets["OPENAI_API_KEY"]
 client = OpenAI(api_key=openai_key)
 
@@ -233,4 +231,5 @@ if question:
         answer = answer_question(question, central)
 
         st.write(answer)
+
 
