@@ -304,7 +304,6 @@ with col1:
 
 with col2:
     st.header("📝 Text Summarizer")
-    st.write("Enter any text below to get an AI-powered summary.")
 
     input_text = st.text_area(
         "Enter text to summarize:",
@@ -337,3 +336,4 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
