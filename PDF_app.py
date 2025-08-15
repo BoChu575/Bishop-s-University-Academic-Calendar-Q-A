@@ -53,6 +53,11 @@ def add_fullscreen_background():
                     padding-bottom: 80px !important;
                 }}
 
+                .center-content {{
+                    text-align: center !important;
+                    margin: 1rem 0 !important;
+                }}
+
                 .center-title {{
                     text-align: left !important;
                 }}
@@ -169,8 +174,17 @@ def add_fullscreen_background():
 
 add_fullscreen_background()
 
+# Main title
+st.title("Bishop's University AI Assistant")
 
-st.title("Bishop's University Academic Calendar Q&A")
+# Centered answering mode selection
+st.markdown('<div class="center-content">', unsafe_allow_html=True)
+mode = st.radio(
+    "Choose Answering Mode", 
+    ["Single Model (GPT-3.5)", "Multi-Model (3.5 + 4)"],
+    horizontal=True
+)
+st.markdown('</div>', unsafe_allow_html=True)
 
 openai_key = st.secrets["OPENAI_API_KEY"]
 client = OpenAI(api_key=openai_key)
@@ -254,9 +268,9 @@ def answer_question(question, section_text):
         return f"[Error] {str(e)}"
 
 
-def summarize_calendar_content(subject):
-
-
+def summarize_calendar_content(subject, model="gpt-3.5-turbo"):
+    """Summarize academic calendar content by subject using specified model"""
+    # Find related section
     section = identify_section(subject)
     section_text = SECTION_TEXTS[section]
     
@@ -272,7 +286,7 @@ Please provide a detailed summary covering all relevant information about this t
     
     try:
         response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model=model,
             messages=[{"role": "user", "content": prompt}]
         )
         return response.choices[0].message.content.strip()
@@ -280,16 +294,13 @@ Please provide a detailed summary covering all relevant information about this t
         return f"[Error] {str(e)}"
 
 
+# Create two-column layout
 col1, col2 = st.columns([1, 1], gap="large")
 
+# Left: Q&A
 with col1:
     st.header("📖 Q&A")
 
-    mode = st.radio(
-        "Choose Answering Mode", 
-        ["Single Model (GPT-3.5)", "Multi-Model (3.5 + 4)"],
-        horizontal=True
-    )
     question = st.text_input(
         "question", 
         placeholder="Type your question here...",
@@ -331,10 +342,9 @@ with col1:
                 unsafe_allow_html=True
             )
 
-
+# Right: Summarizer
 with col2:
     st.header("📃 Summarizer")
-    
     
     subject_input = st.text_input(
         "subject",
@@ -342,22 +352,43 @@ with col2:
         label_visibility="collapsed"
     )
     
-    
+    # Auto-generate summary when input provided
     if subject_input.strip():
-        with st.spinner("Generating summary from Academic Calendar..."):
+        with st.spinner("Generating summary..."):
             section = identify_section(subject_input)
-            summary = summarize_calendar_content(subject_input)
             
-            st.markdown(f"**Related Section:** {section.replace('_', ' ').title()}")
-            st.markdown(
-                f"""
-                <div class="summary-section">
-                    <p>{summary}</p>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
+            if mode.startswith("Single"):
+                summary = summarize_calendar_content(subject_input, "gpt-3.5-turbo")
+                st.markdown(f"**Related Section:** {section.replace('_', ' ').title()}")
+                st.markdown(
+                    f"""
+                    <div class="summary-section">
+                        <p>{summary}</p>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+            else:
+                # Multi-model approach for summarizer
+                models = ["gpt-3.5-turbo", "gpt-4"]
+                summaries = [summarize_calendar_content(subject_input, model) for model in models]
+                matrix = compute_similarity_matrix(summaries)
+                central_summary = find_central_summary(matrix, summaries)
+                
+                st.markdown(f"**Related Section:** {section.replace('_', ' ').title()}")
+                st.subheader("Similarity Matrix")
+                st.dataframe(pd.DataFrame(matrix, index=models, columns=models))
+                
+                st.markdown(
+                    f"""
+                    <div class="summary-section">
+                        <p>{central_summary}</p>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
 
+# Footer
 st.markdown(
     """
     <div class="footer">
