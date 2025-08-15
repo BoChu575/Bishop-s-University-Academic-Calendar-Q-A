@@ -7,6 +7,8 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import base64
 import os
+import PyPDF2
+import io
 
 st.set_page_config(page_title="Bishop's University Academic Calendar Q&A", layout="wide")
 
@@ -161,6 +163,37 @@ def add_fullscreen_background():
                     font-size: 12px;
                     z-index: 999;
                 }}
+
+                .pdf-status {{
+                    background-color: rgba(0, 255, 0, 0.2);
+                    color: white;
+                    text-align: center;
+                    padding: 8px;
+                    border-radius: 5px;
+                    margin-bottom: 15px;
+                    border: 1px solid rgba(255,255,255,0.3);
+                }}
+
+                .pdf-error {{
+                    background-color: rgba(255, 0, 0, 0.2);
+                    color: white;
+                    text-align: center;
+                    padding: 8px;
+                    border-radius: 5px;
+                    margin-bottom: 15px;
+                    border: 1px solid rgba(255,0,0,0.5);
+                }}
+
+                .section-indicator {{
+                    background-color: rgba(0, 191, 255, 0.3);
+                    color: white;
+                    padding: 5px 10px;
+                    border-radius: 15px;
+                    font-size: 12px;
+                    display: inline-block;
+                    margin-bottom: 10px;
+                    border: 1px solid rgba(255,255,255,0.4);
+                }}
                 </style>
                 """,
                 unsafe_allow_html=True
@@ -172,73 +205,291 @@ def add_fullscreen_background():
         st.warning(f"Not found: image/Purple_Background-scaled.jpg")
 
 
+# Table of Contents structure based on the provided catalog
+TABLE_OF_CONTENTS = {
+    "sessional_dates": {
+        "title": "Sessional Dates",
+        "start_page": 5,
+        "end_page": 6,
+        "keywords": ["sessional", "deadline", "date", "calendar", "term begins", "last day", "important dates",
+                     "start", "end", "semester", "exam", "registration", "fall", "winter", "spring"]
+    },
+    "general_information": {
+        "title": "General Information", 
+        "start_page": 7,
+        "end_page": 8,
+        "keywords": ["overview", "history", "background", "mission", "general info", "university info", "about",
+                     "founded", "campus", "location"]
+    },
+    "admission": {
+        "title": "Admission",
+        "start_page": 9,
+        "end_page": 14,
+        "keywords": ["admission", "apply", "application", "requirements", "criteria", "accepted", "how to apply", 
+                     "entrance", "eligibility", "prerequisite", "grade", "average"]
+    },
+    "fees": {
+        "title": "Fees",
+        "start_page": 15,
+        "end_page": 18,
+        "keywords": ["fee", "tuition", "cost", "pay", "payment", "charge", "billing", "price", 
+                     "international student fee", "financial", "money", "expense"]
+    },
+    "university_regulations": {
+        "title": "University Regulations",
+        "start_page": 19,
+        "end_page": 42,
+        "keywords": ["regulation", "withdraw", "academic", "rules", "policies", "credit limit",
+                     "academic standing", "fail", "probation", "suspension", "policy", "procedure"]
+    },
+    "programs_courses": {
+        "title": "Programs and Courses",
+        "start_page": 43,
+        "end_page": 266,
+        "keywords": ["program", "course", "credits", "major", "minor", "degree", "curriculum", "structure", "hours",
+                     "code", "bachelor", "master", "prerequisite", "faculty", "department"]
+    },
+    "business": {
+        "title": "Williams School of Business",
+        "start_page": 47,
+        "end_page": 72,
+        "keywords": ["business", "commerce", "management", "accounting", "finance", "marketing", "economics",
+                     "williams", "bba", "entrepreneurship"]
+    },
+    "education": {
+        "title": "School of Education",
+        "start_page": 73,
+        "end_page": 90,
+        "keywords": ["education", "teaching", "teacher", "pedagogy", "b.ed", "bed", "classroom", "learning"]
+    },
+    "humanities": {
+        "title": "Faculty of Humanities",
+        "start_page": 91,
+        "end_page": 168,
+        "keywords": ["humanities", "arts", "english", "history", "philosophy", "drama", "music", "language",
+                     "literature", "culture", "fine arts", "classical"]
+    },
+    "sciences": {
+        "title": "Faculty of Natural Sciences and Mathematics",
+        "start_page": 169,
+        "end_page": 214,
+        "keywords": ["science", "math", "mathematics", "biology", "chemistry", "physics", "computer science",
+                     "astronomy", "biochemistry", "natural", "pre-medicine"]
+    },
+    "social_sciences": {
+        "title": "Faculty of Social Sciences",
+        "start_page": 215,
+        "end_page": 266,
+        "keywords": ["social science", "psychology", "sociology", "politics", "geography", "environment",
+                     "economics", "sports", "international studies"]
+    },
+    "graduate_programs": {
+        "title": "Graduate Programs",
+        "start_page": 267,
+        "end_page": 294,
+        "keywords": ["graduate", "master", "masters", "m.ed", "med", "m.a", "ma", "phd", "doctorate",
+                     "postgraduate", "thesis", "research"]
+    },
+    "services_facilities": {
+        "title": "Services and Facilities",
+        "start_page": 295,
+        "end_page": 304,
+        "keywords": ["residence", "library", "housing", "services", "support", "health", "transport",
+                     "student life", "facilities", "dining", "recreation", "campus"]
+    },
+    "scholarships": {
+        "title": "Scholarships, Awards, Bursaries, Loans, and Prizes",
+        "start_page": 305,
+        "end_page": 328,
+        "keywords": ["scholarship", "bursary", "award", "prize", "financial aid", "entrance scholarship", "funding",
+                     "grant", "money", "loan", "assistance"]
+    },
+    "administration": {
+        "title": "Administration and Librarians",
+        "start_page": 329,
+        "end_page": 340,
+        "keywords": ["dean", "registrar", "president", "principal", "senate", "chancellor", "governance", "trustees",
+                     "faculty", "staff", "administration", "librarian"]
+    }
+}
+
+
+@st.cache_data
+def load_pdf_content():
+    """Load and parse the PDF file content with table of contents structure"""
+    pdf_file_path = "BU-AcCal-2025-2026-REV-July-2.pdf"
+    
+    try:
+        with open(pdf_file_path, 'rb') as file:
+            pdf_reader = PyPDF2.PdfReader(file)
+            total_pages = len(pdf_reader.pages)
+            
+            # Store page contents
+            page_contents = {}
+            for page_num, page in enumerate(pdf_reader.pages):
+                page_text = page.extract_text()
+                page_contents[page_num + 1] = page_text
+            
+            # Extract sections based on table of contents
+            sections = {}
+            for section_key, section_info in TABLE_OF_CONTENTS.items():
+                start_page = section_info["start_page"]
+                end_page = min(section_info["end_page"], total_pages)
+                
+                section_text = ""
+                for page_num in range(start_page, end_page + 1):
+                    if page_num in page_contents:
+                        section_text += f"\n[Page {page_num}]\n{page_contents[page_num]}\n"
+                
+                sections[section_key] = {
+                    "title": section_info["title"],
+                    "content": section_text,
+                    "page_range": f"{start_page}-{end_page}",
+                    "keywords": section_info["keywords"]
+                }
+            
+            return {
+                "sections": sections,
+                "page_contents": page_contents,
+                "total_pages": total_pages,
+                "status": "success"
+            }
+    
+    except FileNotFoundError:
+        return {
+            "sections": {},
+            "page_contents": {},
+            "total_pages": 0,
+            "status": "file_not_found",
+            "error": f"PDF file '{pdf_file_path}' not found. Please ensure the file is in the same directory as this script."
+        }
+    except Exception as e:
+        return {
+            "sections": {},
+            "page_contents": {},
+            "total_pages": 0,
+            "status": "error",
+            "error": f"Error reading PDF: {str(e)}"
+        }
+
+
+def identify_relevant_sections(question, top_k=2):
+    """Identify the most relevant sections based on keywords and content similarity"""
+    question_lower = question.lower()
+    section_scores = {}
+    
+    # Calculate keyword matching scores
+    for section_key, section_info in TABLE_OF_CONTENTS.items():
+        keyword_score = 0
+        for keyword in section_info["keywords"]:
+            if re.search(r'\b' + re.escape(keyword.lower()) + r'\b', question_lower):
+                keyword_score += 1
+        section_scores[section_key] = keyword_score
+    
+    # If no keyword matches, use TF-IDF similarity if PDF is loaded
+    if all(score == 0 for score in section_scores.values()) and pdf_content["status"] == "success":
+        try:
+            # Create documents for similarity calculation
+            documents = [question]
+            section_keys = []
+            
+            for section_key, section_data in pdf_content["sections"].items():
+                if section_data["content"].strip():
+                    documents.append(section_data["content"][:1000])  # First 1000 chars
+                    section_keys.append(section_key)
+            
+            if len(documents) > 1:
+                vectorizer = TfidfVectorizer(stop_words='english', max_features=500)
+                tfidf_matrix = vectorizer.fit_transform(documents)
+                
+                # Calculate similarity between question and sections
+                question_vector = tfidf_matrix[0:1]
+                section_vectors = tfidf_matrix[1:]
+                similarities = cosine_similarity(question_vector, section_vectors).flatten()
+                
+                # Update scores with similarity
+                for i, section_key in enumerate(section_keys):
+                    section_scores[section_key] = similarities[i]
+        
+        except Exception as e:
+            # Fallback to general_information if similarity calculation fails
+            section_scores["general_information"] = 1.0
+    
+    # Get top sections
+    if all(score == 0 for score in section_scores.values()):
+        return ["general_information"]  # Default fallback
+    
+    # Sort by score and return top k
+    sorted_sections = sorted(section_scores.items(), key=lambda x: x[1], reverse=True)
+    relevant_sections = [section for section, score in sorted_sections[:top_k] if score > 0]
+    
+    return relevant_sections if relevant_sections else ["general_information"]
+
+
+def get_section_content(section_keys):
+    """Get content for specified sections"""
+    if pdf_content["status"] != "success":
+        return "", "PDF content not available"
+    
+    combined_content = ""
+    section_titles = []
+    
+    for section_key in section_keys:
+        if section_key in pdf_content["sections"]:
+            section_data = pdf_content["sections"][section_key]
+            combined_content += f"\n\n=== {section_data['title']} (Pages {section_data['page_range']}) ===\n"
+            combined_content += section_data["content"]
+            section_titles.append(section_data['title'])
+    
+    return combined_content, ", ".join(section_titles)
+
+
 add_fullscreen_background()
+
+# Load PDF content
+pdf_content = load_pdf_content()
 
 # Main title
 st.title("Bishop's University Academic Calendar Assistant")
 
-# Centered answering mode selection
-st.markdown('<div class="center-content">', unsafe_allow_html=True)
-mode = st.radio(
-    "Choose Answering Mode", 
-    ["Single Model (GPT-3.5)", "Multi-Model (3.5 + 4)"],
-    horizontal=True
-)
-st.markdown('</div>', unsafe_allow_html=True)
+# Only show errors if PDF fails to load
+if pdf_content["status"] == "file_not_found":
+    st.markdown(
+        f"""
+        <div class="pdf-error">
+            ❌ {pdf_content["error"]}
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+elif pdf_content["status"] == "error":
+    st.markdown(
+        f"""
+        <div class="pdf-error">
+            ⚠️ {pdf_content["error"]}
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
-openai_key = st.secrets["OPENAI_API_KEY"]
+# Multi-Model mode enabled by default
+try:
+    openai_key = st.secrets["OPENAI_API_KEY"]
+except:
+    st.error("⚠️ OpenAI API key not found. Please configure it in Streamlit secrets.")
+    st.stop()
+
 client = OpenAI(api_key=openai_key)
-
-SECTION_KEYWORDS = {
-    "sessional_dates": ["sessional", "deadline", "date", "calendar", "term begins", "last day", "important dates",
-                        "start", "end"],
-    "general_information": ["overview", "history", "background", "mission", "general info", "university info"],
-    "admission": ["admission", "apply", "application", "requirements", "criteria", "accepted", "how to apply"],
-    "fees": ["fee", "tuition", "cost", "pay", "payment", "charge", "billing", "price", "international student fee"],
-    "university_regulations": ["regulation", "withdraw", "academic", "rules", "policies", "credit limit",
-                               "academic standing", "fail"],
-    "programs_courses": ["program", "course", "credits", "major", "minor", "degree", "curriculum", "structure", "hours",
-                         "code"],
-    "services_facilities": ["residence", "library", "housing", "services", "support", "health", "transport",
-                            "student life"],
-    "scholarships": ["scholarship", "bursary", "award", "prize", "financial aid", "entrance scholarship", "funding",
-                     "grant"],
-    "administration": ["dean", "registrar", "president", "principal", "senate", "chancellor", "governance", "trustees"],
-    "index": ["index", "reference", "table", "contents"]
-}
-
-SECTION_TEXTS = {
-    "sessional_dates": """[Page 5] Fall term begins on September 4... [Page 6] Winter term starts on January 6...""",
-    "general_information": """[Page 7] Bishop's University was founded in 1843...""",
-    "admission": """[Page 9] Students may apply online... Graduate admissions require...""",
-    "fees": """[Page 15] Tuition for Canadian students is approximately $7,000...""",
-    "university_regulations": """[Page 19] Students must maintain full-time status... Detailed academic policies follow.""",
-    "programs_courses": """[Page 37] The BSc in Computer Science requires 90 credits...""",
-    "services_facilities": """[Page 253] On-campus housing is available...""",
-    "scholarships": """[Page 263] Entrance scholarships are awarded automatically...""",
-    "administration": """[Page 287] The university is governed by a Senate...""",
-    "index": """[Page 293—299] Index of terms..."""
-}
-
-
-def identify_section(question):
-    q = question.lower()
-    scores = {}
-    for section, keywords in SECTION_KEYWORDS.items():
-        count = sum(1 for kw in keywords if re.search(r'\b' + re.escape(kw.lower()) + r'\b', q))
-        scores[section] = count
-    if all(score == 0 for score in scores.values()):
-        return "general_information"
-    return max(scores, key=scores.get)
 
 
 def summarize_with_model(text, model):
+    """Summarize text using specified model"""
     try:
         response = client.chat.completions.create(
             model=model,
             messages=[
-                {"role": "system", "content": "Summarize the following academic content."},
-                {"role": "user", "content": text[:3000]}
+                {"role": "system", "content": "Summarize the following academic content from Bishop's University calendar. Focus on key information that would be most useful for students."},
+                {"role": "user", "content": text[:4000]}
             ]
         )
         return response.choices[0].message.content.strip()
@@ -247,17 +498,32 @@ def summarize_with_model(text, model):
 
 
 def compute_similarity_matrix(summaries):
+    """Compute similarity matrix between summaries"""
+    if len(summaries) < 2:
+        return np.array([[1.0]])
     vect = TfidfVectorizer().fit_transform(summaries)
     return cosine_similarity(vect)
 
 
 def find_central_summary(matrix, summaries):
+    """Find the most central summary based on similarity scores"""
     scores = matrix.sum(axis=1)
     return summaries[int(np.argmax(scores))]
 
 
-def answer_question(question, section_text):
-    prompt = f"""You are a helpful academic advisor at Bishop's University.\nUse the following academic calendar section to answer the student's question.\n\nSection:\n{section_text[:3000]}\n\nQuestion:\n{question}\n\nAnswer:"""
+def answer_question(question, relevant_content, section_titles):
+    """Answer question based on relevant PDF content"""
+    prompt = f"""You are a helpful academic advisor at Bishop's University.
+Use the following content from the Bishop's University Academic Calendar 2025-2026 to answer the student's question.
+The content comes from these sections: {section_titles}
+
+Academic Calendar Content:
+{relevant_content[:5000]}
+
+Student Question: {question}
+
+Please provide a helpful and accurate answer based on the calendar information. If the answer involves specific page numbers, deadlines, or requirements, please include those details:"""
+    
     try:
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
@@ -270,15 +536,19 @@ def answer_question(question, section_text):
 
 def summarize_calendar_content(subject, model="gpt-3.5-turbo"):
     """Summarize academic calendar content by subject using specified model"""
-    # Find related section
-    section = identify_section(subject)
-    section_text = SECTION_TEXTS[section]
+    # Find relevant sections for the subject
+    relevant_sections = identify_relevant_sections(subject, top_k=2)
+    relevant_content, section_titles = get_section_content(relevant_sections)
+    
+    if not relevant_content.strip():
+        return f"Unable to find relevant information about '{subject}' in the academic calendar."
     
     prompt = f"""You are a helpful academic advisor at Bishop's University. 
-Please provide a comprehensive summary about "{subject}" based on the following academic calendar section.
-Focus on the key information that would be most useful for students.
+Please provide a comprehensive summary about "{subject}" based on the following content from the Bishop's University Academic Calendar 2025-2026.
+The content comes from these sections: {section_titles}
 
-Section: {section_text}
+Calendar Content:
+{relevant_content[:4000]}
 
 Subject: {subject}
 
@@ -308,35 +578,51 @@ with col1:
     )
 
     if question:
-        section = identify_section(question)
-        st.markdown(f"**Matched Section:** {section.replace('_', ' ').title()}")
-        section_text = SECTION_TEXTS[section]
-
-        if mode.startswith("Single"):
-            answer = answer_question(question, section_text)
+        if pdf_content["status"] == "success":
+            # Find relevant sections
+            relevant_sections = identify_relevant_sections(question, top_k=2)
+            relevant_content, section_titles = get_section_content(relevant_sections)
+            
+            # Display matched sections
             st.markdown(
                 f"""
-                <div class="summary-section">
-                    <p>{answer}</p>
+                <div class="section-indicator">
+                    📍 Matched Sections: {section_titles}
                 </div>
                 """,
                 unsafe_allow_html=True
             )
+            
+            if relevant_content.strip():
+                # Multi-model approach by default
+                models = ["gpt-3.5-turbo", "gpt-4"]
+                summaries = [summarize_with_model(relevant_content, m) for m in models]
+                matrix = compute_similarity_matrix(summaries)
+                central = find_central_summary(matrix, summaries)
 
+                answer = answer_question(question, central, section_titles)
+                st.markdown(
+                    f"""
+                    <div class="summary-section">
+                        <p>{answer}</p>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+            else:
+                st.markdown(
+                    """
+                    <div class="summary-section">
+                        <p>Unable to find relevant information for your question. Please try rephrasing your question or check if it relates to content covered in the academic calendar.</p>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
         else:
-            models = ["gpt-3.5-turbo", "gpt-4"]
-            summaries = [summarize_with_model(section_text, m) for m in models]
-            matrix = compute_similarity_matrix(summaries)
-            central = find_central_summary(matrix, summaries)
-
-            st.subheader("Similarity Matrix")
-            st.dataframe(pd.DataFrame(matrix, index=models, columns=models))
-
-            answer = answer_question(question, central)
             st.markdown(
-                f"""
+                """
                 <div class="summary-section">
-                    <p>{answer}</p>
+                    <p>PDF file is not available. Please ensure 'BU-AcCal-2025-2026-REV-July-2.pdf' is in the same directory as this application.</p>
                 </div>
                 """,
                 unsafe_allow_html=True
@@ -354,30 +640,27 @@ with col2:
     
     # Auto-generate summary when input provided
     if subject_input.strip():
-        with st.spinner("Generating summary..."):
-            section = identify_section(subject_input)
-            
-            if mode.startswith("Single"):
-                summary = summarize_calendar_content(subject_input, "gpt-3.5-turbo")
-                st.markdown(f"**Related Section:** {section.replace('_', ' ').title()}")
+        if pdf_content["status"] == "success":
+            with st.spinner("Generating summary..."):
+                # Find relevant sections
+                relevant_sections = identify_relevant_sections(subject_input, top_k=2)
+                _, section_titles = get_section_content(relevant_sections)
+                
+                # Display matched sections
                 st.markdown(
                     f"""
-                    <div class="summary-section">
-                        <p>{summary}</p>
+                    <div class="section-indicator">
+                        📍 Relevant Sections: {section_titles}
                     </div>
                     """,
                     unsafe_allow_html=True
                 )
-            else:
-                # Multi-model approach for summarizer
+                
+                # Multi-model approach by default
                 models = ["gpt-3.5-turbo", "gpt-4"]
                 summaries = [summarize_calendar_content(subject_input, model) for model in models]
                 matrix = compute_similarity_matrix(summaries)
                 central_summary = find_central_summary(matrix, summaries)
-                
-                st.markdown(f"**Related Section:** {section.replace('_', ' ').title()}")
-                st.subheader("Similarity Matrix")
-                st.dataframe(pd.DataFrame(matrix, index=models, columns=models))
                 
                 st.markdown(
                     f"""
@@ -387,14 +670,22 @@ with col2:
                     """,
                     unsafe_allow_html=True
                 )
+        else:
+            st.markdown(
+                """
+                <div class="summary-section">
+                    <p>PDF file is not available. Please ensure 'BU-AcCal-2025-2026-REV-July-2.pdf' is in the same directory as this application.</p>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
 
 # Footer
 st.markdown(
     """
     <div class="footer">
-        Copyright © BU. Version 0.1. Last update August 2025
+        Copyright © BU. Version 0.3 - Smart Section-Based Processing. Last update August 2025
     </div>
     """,
     unsafe_allow_html=True
 )
-
