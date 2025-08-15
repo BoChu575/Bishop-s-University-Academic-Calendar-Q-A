@@ -8,7 +8,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 import base64
 import os
 
-st.set_page_config(page_title="Bishop's University Academic Calendar Q&A", layout = "wide")
+st.set_page_config(page_title="Bishop's University Academic Calendar Q&A", layout="wide")
 
 
 def add_fullscreen_background():
@@ -169,6 +169,7 @@ def add_fullscreen_background():
 
 add_fullscreen_background()
 
+st.title("Bishop's University Academic Calendar Q&A")
 
 openai_key = st.secrets["OPENAI_API_KEY"]
 client = OpenAI(api_key=openai_key)
@@ -305,7 +306,6 @@ with col2:
     st.header("📝 Text Summarizer")
     st.write("Enter any text below to get an AI-powered summary.")
 
-    # 文本输入框
     input_text = st.text_area(
         "Enter text to summarize:",
         height=300,
@@ -337,5 +337,3 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
-
-
