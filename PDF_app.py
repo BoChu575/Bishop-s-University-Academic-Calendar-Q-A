@@ -8,6 +8,8 @@ from sklearn.metrics.pairwise import cosine_similarity
 import base64
 import os
 
+st.set_page_config(page_title="Bishop's University Academic Calendar Q&A", layout = "wide")
+
 
 def add_fullscreen_background():
     image_path = "image/Purple_Background-scaled.jpg"
@@ -167,7 +169,6 @@ def add_fullscreen_background():
 
 add_fullscreen_background()
 
-st.set_page_config(page_title="Bishop's University Academic Calendar Q&A", layout = "wide")
 
 openai_key = st.secrets["OPENAI_API_KEY"]
 client = OpenAI(api_key=openai_key)
@@ -336,4 +337,5 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
