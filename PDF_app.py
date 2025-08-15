@@ -123,14 +123,6 @@ add_fullscreen_background()
 
 st.title("Bishop's University Academic Calendar Q&A")
 
-st.markdown(
-    """
-    <div class="footer">
-        Copyright © BU. Version 0.1. Last update August 2025
-    </div>
-    """,
-    unsafe_allow_html=True
-)
 
 openai_key = st.secrets["OPENAI_API_KEY"]
 client = OpenAI(api_key=openai_key)
@@ -233,3 +225,11 @@ if question:
         st.write(answer)
 
 
+st.markdown(
+    """
+    <div class="footer">
+        Copyright © BU. Version 0.1. Last update August 2025
+    </div>
+    """,
+    unsafe_allow_html=True
+)
