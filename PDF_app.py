@@ -117,6 +117,10 @@ def add_fullscreen_background():
     else:
         st.warning(f"Not found: image/Purple_Background-scaled.jpg")
 
+
+
+add_fullscreen_background()
+
 st.markdown(
     """
     <div class="footer">
@@ -125,8 +129,6 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
-
-add_fullscreen_background()
 
 st.title("Bishop's University Academic Calendar Q&A")
 
@@ -231,3 +233,4 @@ if question:
         answer = answer_question(question, central)
 
         st.write(answer)
+
