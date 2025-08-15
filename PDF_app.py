@@ -45,9 +45,19 @@ def add_fullscreen_background():
                 .main .block-container {{
                     padding-top: 1rem;
                     margin-top: 0rem;
-                    max-width: 75% !important;  
-                    margin-left: 2rem !important; 
+                    max-width: 90% !important;  
+                    margin-left: auto !important; 
                     margin-right: auto !important; 
+                    padding-bottom: 80px !important;
+                }}
+
+                .center-title {{
+                    text-align: left !important;
+                }}
+
+                .column-header {{
+                    text-align: left !important;
+                    margin-bottom: 1rem !important;
                 }}
 
                 .stApp, .stApp > div {{
@@ -82,6 +92,16 @@ def add_fullscreen_background():
                     background-color: rgba(255,255,255,0.9) !important;
                 }}
 
+                .stTextArea > label {{
+                    color: white !important;
+                    font-weight: bold !important;
+                }}
+
+                .stTextArea textarea {{
+                    color: black !important;
+                    background-color: rgba(255,255,255,0.9) !important;
+                }}
+
                 .stSelectbox > label {{
                     color: white !important;
                 }}
@@ -107,6 +127,33 @@ def add_fullscreen_background():
                 .matched-section * {{
                     color: black !important;
                 }}
+
+                .summary-section {{
+                    background-color: rgba(255,255,255,0.9) !important;
+                    color: black !important;
+                    padding: 1rem !important;
+                    border-radius: 8px !important;
+                    margin: 1rem 0 !important;
+                    border: 2px solid rgba(255,255,255,0.8) !important;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.3) !important;
+                }}
+
+                .summary-section * {{
+                    color: black !important;
+                }}
+
+                .footer {{
+                    position: fixed;
+                    left: 0;
+                    bottom: 0;
+                    width: 100%;
+                    background-color: rgba(0,0,0,0.7);
+                    color: white;
+                    text-align: center;
+                    padding: 10px 0;
+                    font-size: 12px;
+                    z-index: 999;
+                }}
                 </style>
                 """,
                 unsafe_allow_html=True
@@ -118,28 +165,30 @@ def add_fullscreen_background():
         st.warning(f"Not found: image/Purple_Background-scaled.jpg")
 
 
-
 add_fullscreen_background()
 
 st.title("Bishop's University Academic Calendar Q&A")
-
 
 openai_key = st.secrets["OPENAI_API_KEY"]
 client = OpenAI(api_key=openai_key)
 
 SECTION_KEYWORDS = {
-    "sessional_dates": ["sessional", "deadline", "date", "calendar", "term begins", "last day", "important dates", "start", "end"],
+    "sessional_dates": ["sessional", "deadline", "date", "calendar", "term begins", "last day", "important dates",
+                        "start", "end"],
     "general_information": ["overview", "history", "background", "mission", "general info", "university info"],
     "admission": ["admission", "apply", "application", "requirements", "criteria", "accepted", "how to apply"],
     "fees": ["fee", "tuition", "cost", "pay", "payment", "charge", "billing", "price", "international student fee"],
-    "university_regulations": ["regulation", "withdraw", "academic", "rules", "policies", "credit limit", "academic standing", "fail"],
-    "programs_courses": ["program", "course", "credits", "major", "minor", "degree", "curriculum", "structure", "hours", "code"],
-    "services_facilities": ["residence", "library", "housing", "services", "support", "health", "transport", "student life"],
-    "scholarships": ["scholarship", "bursary", "award", "prize", "financial aid", "entrance scholarship", "funding", "grant"],
+    "university_regulations": ["regulation", "withdraw", "academic", "rules", "policies", "credit limit",
+                               "academic standing", "fail"],
+    "programs_courses": ["program", "course", "credits", "major", "minor", "degree", "curriculum", "structure", "hours",
+                         "code"],
+    "services_facilities": ["residence", "library", "housing", "services", "support", "health", "transport",
+                            "student life"],
+    "scholarships": ["scholarship", "bursary", "award", "prize", "financial aid", "entrance scholarship", "funding",
+                     "grant"],
     "administration": ["dean", "registrar", "president", "principal", "senate", "chancellor", "governance", "trustees"],
     "index": ["index", "reference", "table", "contents"]
 }
-
 
 SECTION_TEXTS = {
     "sessional_dates": """[Page 5] Fall term begins on September 4... [Page 6] Winter term starts on January 6...""",
@@ -151,7 +200,7 @@ SECTION_TEXTS = {
     "services_facilities": """[Page 253] On-campus housing is available...""",
     "scholarships": """[Page 263] Entrance scholarships are awarded automatically...""",
     "administration": """[Page 287] The university is governed by a Senate...""",
-    "index": """[Page 293â€"299] Index of terms..."""
+    "index": """[Page 293—299] Index of terms..."""
 }
 
 
@@ -164,6 +213,7 @@ def identify_section(question):
     if all(score == 0 for score in scores.values()):
         return "general_information"
     return max(scores, key=scores.get)
+
 
 def summarize_with_model(text, model):
     try:
@@ -178,16 +228,19 @@ def summarize_with_model(text, model):
     except Exception as e:
         return f"[Error: {str(e)}]"
 
+
 def compute_similarity_matrix(summaries):
     vect = TfidfVectorizer().fit_transform(summaries)
     return cosine_similarity(vect)
+
 
 def find_central_summary(matrix, summaries):
     scores = matrix.sum(axis=1)
     return summaries[int(np.argmax(scores))]
 
+
 def answer_question(question, section_text):
-    prompt = f"""You are a helpful academic advisor at Bishopâ€™s University.\nUse the following academic calendar section to answer the studentâ€™s question.\n\nSection:\n{section_text[:3000]}\n\nQuestion:\n{question}\n\nAnswer:"""
+    prompt = f"""You are a helpful academic advisor at Bishop's University.\nUse the following academic calendar section to answer the student's question.\n\nSection:\n{section_text[:3000]}\n\nQuestion:\n{question}\n\nAnswer:"""
     try:
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
@@ -197,33 +250,83 @@ def answer_question(question, section_text):
     except Exception as e:
         return f"[Error] {str(e)}"
 
-mode = st.radio("Choose Answering Mode", ["Single Model (GPT-3.5)", "Multi-Model (3.5 + 4)"])
-question = st.text_input("Ask a question about the BU Academic Calendar:")
 
-if question:
-    section = identify_section(question)
-    st.markdown(f"**Matched Section:** {section.replace('_', ' ').title()}")
-    section_text = SECTION_TEXTS[section]
+def summarize_text(input_text, summary_type="general"):
+    if summary_type == "general":
+        prompt = f"""Please provide a concise and clear summary of the following text. Focus on the main points and key information:\n\n{input_text[:4000]}"""
+    elif summary_type == "academic":
+        prompt = f"""Please provide an academic summary of the following text, highlighting key concepts, main arguments, and important details:\n\n{input_text[:4000]}"""
+    elif summary_type == "bullet":
+        prompt = f"""Please summarize the following text in bullet points, organizing the main ideas clearly:\n\n{input_text[:4000]}"""
 
-    if mode.startswith("Single"):
-        answer = answer_question(question, section_text)
-        st.subheader("Answer")
-        st.write(answer)
+    try:
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        return f"[Error] {str(e)}"
 
-    else:
-        models = ["gpt-3.5-turbo", "gpt-4"]
-        summaries = [summarize_with_model(section_text, m) for m in models]
-        matrix = compute_similarity_matrix(summaries)
-        central = find_central_summary(matrix, summaries)
 
-        st.subheader("Similarity Matrix")
-        st.dataframe(pd.DataFrame(matrix, index=models, columns=models))
+col1, col2 = st.columns([1, 1], gap="large")
 
-        st.subheader("Final Answer (Most Representative Summary)")
-        answer = answer_question(question, central)
+with col1:
+    st.header("📚 Academic Calendar Q&A")
 
-        st.write(answer)
+    mode = st.radio("Choose Answering Mode", ["Single Model (GPT-3.5)", "Multi-Model (3.5 + 4)"])
+    question = st.text_input("Ask a question about the BU Academic Calendar:")
 
+    if question:
+        section = identify_section(question)
+        st.markdown(f"**Matched Section:** {section.replace('_', ' ').title()}")
+        section_text = SECTION_TEXTS[section]
+
+        if mode.startswith("Single"):
+            answer = answer_question(question, section_text)
+            st.subheader("Answer")
+            st.write(answer)
+
+        else:
+            models = ["gpt-3.5-turbo", "gpt-4"]
+            summaries = [summarize_with_model(section_text, m) for m in models]
+            matrix = compute_similarity_matrix(summaries)
+            central = find_central_summary(matrix, summaries)
+
+            st.subheader("Similarity Matrix")
+            st.dataframe(pd.DataFrame(matrix, index=models, columns=models))
+
+            st.subheader("Final Answer (Most Representative Summary)")
+            answer = answer_question(question, central)
+            st.write(answer)
+
+with col2:
+    st.header("📝 Text Summarizer")
+    st.write("Enter any text below to get an AI-powered summary.")
+
+    # 文本输入框
+    input_text = st.text_area(
+        "Enter text to summarize:",
+        height=300,
+        placeholder="Paste your text here..."
+    )
+
+    if st.button("Generate Summary", type="primary"):
+        if input_text.strip():
+            with st.spinner("Generating summary..."):
+                summary = summarize_text(input_text, "general")
+
+                st.markdown(
+                    f"""
+                    <div class="summary-section">
+                        <h4>📑 Summary</h4>
+                        <p>{summary}</p>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+        else:
+            st.warning("Please enter some text to summarize.")
 
 st.markdown(
     """
@@ -233,4 +336,3 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
-
