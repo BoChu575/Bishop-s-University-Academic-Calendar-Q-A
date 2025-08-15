@@ -167,7 +167,7 @@ def add_fullscreen_background():
 
 add_fullscreen_background()
 
-st.title("Bishop's University Academic Calendar Q&A")
+st.set_page_config(page_title="Bishop's University Academic Calendar Q&A", layout = "wide")
 
 openai_key = st.secrets["OPENAI_API_KEY"]
 client = OpenAI(api_key=openai_key)
@@ -336,3 +336,4 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
